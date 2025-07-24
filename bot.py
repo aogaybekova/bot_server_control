@@ -21,14 +21,16 @@ from aiogram.filters import Command
 
 import os
 users = []
-user_id = id
+user_id = num
 users_for_send = []
+users_for_calls_send=[]
 names = []
 save_users_for_send = []
-
+save_users_for_calls_send=[]
 
 #------------------------------- тут объявляем бота----------------------#
-bot = Bot(token="api-token", default=DefaultBotProperties(parse_mode=ParseMode.HTML))
+bot = Bot(token="API_TOKEN",
+          default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
 
@@ -39,6 +41,7 @@ dp = Dispatcher()
 async def start_command(message):
     await message.reply("Чат перезапущен")
 
+#старт
 @dp.message(Command('start'))
 async def start(message: Message):
     print(message.from_user.id, message.from_user.first_name)
@@ -46,6 +49,7 @@ async def start(message: Message):
     names.append(message.from_user.first_name)
     await message.reply("Привет! Я бот отдела рисков")
 
+#регистрация на основную рассылку
 @dp.message(Command('register'))
 async def register(message: Message):
     print(message.from_user.id, message.from_user.first_name)
@@ -59,27 +63,57 @@ async def register(message: Message):
 
     return save_users_for_send
 
+#регистрация на звонки
+@dp.message(Command('register_calls'))
+async def register_calls(message: Message):
+    print(message.from_user.id, message.from_user.first_name)
+    users_for_calls_send.append(message.from_user.id)
+    names.append(message.from_user.first_name)
+    save_users_for_calls_send = list(dict.fromkeys(users_for_calls_send))
+    #await message.reply(message.from_user.id, message.from_user.first_name)
+    await message.reply("Теперь вы будите получать рассылку по звонкам")
+    print('users_for_calls_send', users_for_calls_send)
+
+    return save_users_for_calls_send
+
+#ссыло4ка на мониторинг
 @dp.message(Command('info_monitoring'))
 async def info_mon(message: Message):
     await message.reply("https://huggingface.co/spaces/picklecucumber/monitoring")
 
+#ссыло4ка на разведение потоков
 @dp.message(Command('info_stream_branching'))
 async def info_branch(message: Message):
     await message.reply("https://www.figma.com/deck/kQ5bwvIjSYkdvg1yZ0xPkS/Customer-segmentation-models-presentation?node-id=1-1196&node-type=canvas&t=7ykCiSNbdD8CDEgD-1&scaling=min-zoom&content-scaling=fixed&page-id=0%3A1")
 
-@dp.message(Command('last_apps'))
+#последняя заявка
+@dp.message(Command('last_app'))
 async def start_command(message):
     data = new_data()
     await message.answer('последняя прошедшая заявка')
     await message.answer(data.loc[0].to_string())
 
+#последние 5 заявок
 @dp.message(Command('last_five_apps'))
 async def start_command(message):
     data = new_data()
     await message.answer('Последние прошедшие заявки')
     await message.answer(data.to_string())
 
+#проблемные звонки коллекторов
+@dp.message(Command('problem_calls'))
+async def start_command(message):
+    df = collector_calls()
+    await message.answer('Звонки с нарушениями за вчера')
 
+    if df.shape[0] == 1:
+        await message.answer(df.loc[0].to_string())
+    else:
+        for i in range(df.shape[0]):
+            await message.answer(df.loc[i].to_string())
+            await message.answer('--------------------')
+
+#pdn
 @dp.message(Command('pdn'))
 async def PDN(message):
     cutoff=0.03
@@ -112,11 +146,6 @@ async def all_Service(message):
 
 @dp.message(Command('tasklist'))
 async def echo_handler(message: Message) -> None:
-    """
-     Обработчик перенаправит полученное сообщение обратно отправителю.
-
-    По умолчанию обработчик сообщений обрабатывает все типы сообщений (например, текст, фотографию, стикер и т. д.).
-    """
     try:
         await message.answer(subprocess.getoutput('wmic process where "name like "python%"" get processid,commandline'))
 
@@ -126,8 +155,8 @@ async def echo_handler(message: Message) -> None:
 @dp.message(Command('ping'))
 async def send_pong(message):
     pong=""
-    hostname0='localhost'
-    hostname1='localhost2'
+    hostname0='192.168.20.81'
+    hostname1='192.168.20.82'
     response = os.system('ping ' + hostname0)
     response1 = os.system('ping ' + hostname1)
     if (response == 0)&(response1 == 0):
@@ -144,6 +173,18 @@ async def send_pong(message):
 
     await message.reply(pong)
 
+#проверка работы моделей
+@dp.message(Command('check'))
+async def check_anyway(message):
+    s = crash_process()
+    if len(s) !=0:
+        try:
+            await message.answer(text=f"Упала консолька")
+            for i in range(len(s)):
+                await message.answer(text=s[i].to_string())
+        except Exception as e:
+            print(e)
+    else: await message.answer(text=f"Все работает")
 def exec_cmd(command):
     try:
         sub_ = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
@@ -190,30 +231,69 @@ async def report0():
         for i in data.loc[data.flg.eq(True)].iterrows():
             try:
                 for user in users_for_send:
-                    print(user)
                     await bot.send_message(chat_id=user, text=f"Задержка ответа по сервису:  " + str(data.loc[i[0], 'ExternalService']) + ". Ответ по сервису: " + str(round(data.loc[i[0], 'avg_sec'], 2)) + " сек . Максимальное допустимое значение: " + str(data.loc[i[0], 'tresh'])+ " сек.")
-
             except Exception as e:
-                print(users_for_send)
                 print(e)
     else:
         try:
             for user in users_for_send:
-                print(user)
                 await bot.send_message(chat_id=user, text=f"Нет задержек по сервисам")
 
         except Exception as e:
-            print(users_for_send)
             print(e)
+
     text0, text1 = pdn_for_report()
     try:
         for user in users_for_send:
-            print(user)
             await bot.send_message(chat_id=user, text=text1)
             await bot.send_message(chat_id=user, text=text0)
     except Exception as e:
-        print(users_for_send)
         print(e)
+
+
+#попытка репортинга коллекторов
+async def report1():
+    df = collector_calls()
+    if df.shape[0] > 1:
+        for user in users_for_calls_send:
+            try:
+                await bot.send_message(chat_id=user, text=f"Звонки с нарушениями за вчера")
+                for i in range(df.shape[0]):
+                    await bot.send_message(chat_id=user, text=df.loc[i].to_string())
+                    await bot.send_message(chat_id=user, text=f"--------------------")
+            except Exception as e:
+                print(e)
+
+    elif df.shape[0] == 1:
+        for user in users_for_calls_send:
+            try:
+                print(user)
+                await bot.send_message(chat_id=user, text=f"Звонок с нарушениями за вчера")
+                await bot.send_message(chat_id=user, text=df.loc[0].to_string())
+            except Exception as e:
+                print(e)
+    else:
+        for user in users_for_calls_send:
+            try:
+                print(user)
+                await bot.send_message(chat_id=user, text=f"Нет звонков с нарушениями за вчера")
+            except Exception as e:
+                print(e)
+
+#проверка не упалили консоли
+async def check():
+    s = crash_process()
+    if len(s) !=0:
+        try:
+            await bot.send_message(chat_id=user_id, text=f"Упала консолька")
+            for i in range(len(s)):
+                await bot.send_message(chat_id=user_id, text=s[i].to_string())
+        except Exception as e:
+            print(e)
+    else: await bot.send_message(chat_id=user_id, text=f"Все работает")
+
+
+
 async def main() -> None:
 
 
@@ -221,8 +301,9 @@ async def main() -> None:
     scheduler = AsyncIOScheduler()
     timezone="Europe/Moscow"
 
-    scheduler.add_job(report0, trigger="cron", hour=10, minute=30, start_date=datetime.now())
-
+    scheduler.add_job(report0, trigger="cron", hour=10, minute=00, start_date=datetime.now())
+    scheduler.add_job(report1, trigger="cron", hour=10, minute=10, start_date=datetime.now())
+    scheduler.add_job(check, "interval", minutes=30)
     scheduler.start()
     await dp.start_polling(bot)
 
