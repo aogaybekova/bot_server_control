@@ -29,7 +29,7 @@ save_users_for_send = []
 save_users_for_calls_send=[]
 
 #------------------------------- тут объявляем бота----------------------#
-bot = Bot(token="1167220017:AAEETAtuXHGNv8vHi71vOYYpvhKJ_aCWQJI",
+bot = Bot(token="API_token",
           default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
