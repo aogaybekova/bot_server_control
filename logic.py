@@ -110,24 +110,20 @@ def cutoff_services():
 
 #сервисы
 def services():
+
     conn_str = f"mssql+pyodbc://{log}:{psw}@{host}/Billing?driver=SQL+Server"
     engine = create_engine(conn_str)
     try:
         with engine.connect() as conn:
-            conn.execute(text(q1))
-            data = pd.read_sql_query(q2, conn)
-
+            data_OK = pd.read_sql_query(query1, conn)
+            data_time = pd.read_sql_query(query12, conn)
     except Exception as e:
         print("\nAn error occurred: {0}.".format(str(e)))
 
     finally:
         conn.close()
-    cutt = cutoff_services()
-    req = data.merge(cutt, how='inner', on='ExternalService')
-    req['flg'] = req['avg_sec'].ge(req['tresh'])
-    req['diff'] = round(req['avg_sec']/req['tresh'], 3)
+    return data_OK, data_time
 
-    return req
 
 
 def pdn_for_report():
@@ -149,14 +145,5 @@ def pdn_for_report():
         text ="PDN80+ = "+str(round(pdn80*100, 2))+"% . В норме за последние 3 дня"
     return text0, text
 
-def services_for_report():
-    data=services()
-    if len(data.loc[data.flg.eq(True)])==0:
-        text1 = "Нет задержек по сервисам"
-        return text1
-    else:
-        for i in data.loc[data.flg.eq(True)].iterrows():
-            text1 = "Задержка ответа по сервису:  " + str(data.loc[i[0], 'ExternalService'])+ " Максимальное допустимое значение: " + \
-                    str(data.loc[i[0], 'tresh'])
-            return text1
+
 
