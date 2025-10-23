@@ -10,18 +10,18 @@ from aiogram.types import Chat, Message
 import logging
 from telegram.ext import Updater, CommandHandler
 import sys
-from aiogram import Bot, Dispatcher#, html, executor
+from aiogram import Bot, Dispatcher, types#, html, executor
 import aioschedule
 from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 import subprocess
+import re
 from sqlalchemy import create_engine, text
 import gc
 from aiogram.filters import Command
-
 import os
 users = []
-user_id = num
+user_id = my_userid
 users_for_send = []
 users_for_calls_send=[]
 names = []
@@ -29,7 +29,7 @@ save_users_for_send = []
 save_users_for_calls_send=[]
 
 #------------------------------- тут объявляем бота----------------------#
-bot = Bot(token="API_TOKEN",
+bot = Bot(token="1167220017:AAEETAtuXHGNv8vHi71vOYYpvhKJ_aCWQJI",
           default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
@@ -61,7 +61,21 @@ async def register(message: Message):
     print('users_for_send', users_for_send)
     print('save_users_for_send', save_users_for_send)
 
-    return save_users_for_send
+    return users_for_send
+
+#отмена регистрации на основную рассылку
+@dp.message(Command('cancel_register'))
+async def cancel_register(message: Message):
+    print(message.from_user.id, message.from_user.first_name)
+    users_for_send.remove(message.from_user.id)
+    # names.append(message.from_user.first_name)
+    save_users_for_send = list(dict.fromkeys(users_for_send))
+    #await message.reply(message.from_user.id, message.from_user.first_name)
+    await message.reply("Теперь вы не будите получать рассылку")
+    print('users_for_send', users_for_send)
+    print('save_users_for_send', save_users_for_send)
+
+    return users_for_send
 
 #регистрация на звонки
 @dp.message(Command('register_calls'))
@@ -74,7 +88,21 @@ async def register_calls(message: Message):
     await message.reply("Теперь вы будите получать рассылку по звонкам")
     print('users_for_calls_send', users_for_calls_send)
 
-    return save_users_for_calls_send
+    return users_for_calls_send
+
+#отмена регистрации на основную рассылку
+@dp.message(Command('cancel_call'))
+async def cancel_call(message: Message):
+    print(message.from_user.id, message.from_user.first_name)
+    users_for_calls_send.remove(message.from_user.id)
+    # names.append(message.from_user.first_name)
+    save_users_for_calls_send = list(dict.fromkeys(users_for_calls_send))
+    #await message.reply(message.from_user.id, message.from_user.first_name)
+    await message.reply("Теперь вы не будите получать рассылку")
+    print('users_for_send', users_for_calls_send)
+    print('save_users_for_send', save_users_for_calls_send)
+
+    return users_for_calls_send
 
 #ссыло4ка на мониторинг
 @dp.message(Command('info_monitoring'))
@@ -87,7 +115,7 @@ async def info_branch(message: Message):
     await message.reply("https://www.figma.com/deck/kQ5bwvIjSYkdvg1yZ0xPkS/Customer-segmentation-models-presentation?node-id=1-1196&node-type=canvas&t=7ykCiSNbdD8CDEgD-1&scaling=min-zoom&content-scaling=fixed&page-id=0%3A1")
 
 #последняя заявка
-@dp.message(Command('last_app'))
+@dp.message(Command('last_apps'))
 async def start_command(message):
     data = new_data()
     await message.answer('последняя прошедшая заявка')
@@ -130,27 +158,114 @@ async def PDN(message):
 
 @dp.message(Command('service'))
 async def Service(message):
-    data=services()
-    if len(data.loc[data.flg.eq(True)])!=0:
-        for i in data.loc[data.flg.eq(True)].iterrows():
-            await message.answer(f"Задержка ответа по сервису:  " + str(data.loc[i[0], 'ExternalService']) + ". Ответ по сервису: " + str(round(data.loc[i[0], 'avg_sec'],2)) + ". Максимальное допустимое значение: " + str(data.loc[i[0], 'tresh']))
+    data_OK, data_time =services()
 
-    else:
-        await message.answer((f"Нет задержек по сервисам"))
+    # df в строку
+    def format_dataframe_to_string(df):
+        table_string = df.to_string(index=False)
+        return f"<pre>{table_string}</pre>"
+
+    formatted_table0 = format_dataframe_to_string(data_OK.loc[data_OK['Процент ОК']<90][['ExternalServiceName','Процент ОК', 'Процент TIMEOUT']])
+    formatted_table1 = format_dataframe_to_string(data_time.loc[data_time.avg_sec>data_time.avg_sec_month])
+
+    await message.answer(formatted_table0, parse_mode=ParseMode.HTML)
+    await message.answer(formatted_table1, parse_mode=ParseMode.HTML)
+
 
 @dp.message(Command('all_service'))
 async def all_Service(message):
-    data=services()
-    await message.answer(data[['ExternalService', 'avg_sec', 'tresh']].to_string())
+    data_OK, data_time =services()
+
+    # Конвертируем DataFrame в форматированную строку
+    def format_dataframe_to_string(df):
+        table_string = df.to_string(index=False)
+        return f"<pre>{table_string}</pre>"
+
+    # Отправляем сообщение
+    formatted_table0 = format_dataframe_to_string(data_OK[['ExternalServiceName','Процент ОК', 'Процент ERROR','Процент TIMEOUT']])
+    formatted_table1 = format_dataframe_to_string(data_time)
+
+    await message.answer(formatted_table0, parse_mode=ParseMode.HTML)
+    await message.answer(formatted_table1, parse_mode=ParseMode.HTML)
 
 
 @dp.message(Command('tasklist'))
 async def echo_handler(message: Message) -> None:
     try:
-        await message.answer(subprocess.getoutput('wmic process where "name like "python%"" get processid,commandline'))
-
+        await message.answer(subprocess.getoutput('wmic process where "name like "python%" and commandline like "%console_test%"" get processid,commandline'))
     except TypeError:
         await message.answer("Nice cock!")
+
+@dp.message(Command('start_consoles'))
+async def start_consoles(message):
+    target_dirs = ['console', 'console_all', 'console_crimea', 'console_nerez', 'console_antifraud']
+
+    for path in target_dirs:
+    #     try:
+    #         # Формируем правильную команду для запуска в новом окне
+    #         full_path = f'D:\\GITREPO\\console_test\\{path}'
+    #         command = f'python explore.py'
+    #
+    #         # Запускаем процесс с правильными флагами
+    #         subprocess.Popen(
+    #             ['cmd', '/k', command],  # Используем список аргументов вместо строки
+    #             cwd=full_path,  # Устанавливаем рабочую директорию
+    #             creationflags=subprocess.CREATE_NEW_CONSOLE  # Создаем новое консольное окно
+    #         )
+    #         print(f"Запущен процесс: {path}")
+    #     except Exception as e:
+    #         print(f"Ошибка при запуске процесса {path}: {e}")
+
+        try:
+            command = f'cmd /k cd /d D:\\GITREPO\\console_test\\{path} && python explore.py'
+            subprocess.Popen(command,
+                                       shell=True,
+                                       creationflags=subprocess.CREATE_NEW_CONSOLE
+                                       )
+            print(f"Запущен процесс: {path}")
+        except Exception as e:
+            print(f"Ошибка при запуске процесса {path}: {e}")
+
+# перезапуск моделек
+@dp.message(Command('restart_consoles'))
+async def restart_consoles(message):
+    target_dirs = ['console', 'console_all', 'console_crimea', 'console_nerez', 'console_antifraud']
+    command = 'wmic process where "name like "python%" and commandline like "%console_test%"" get processid,commandline'
+    result = subprocess.run(command, shell=True, capture_output=True, text=True, encoding='cp866')
+    lines = result.stdout.strip().split('\n')
+    data = []
+    for line in lines:
+        if not line.strip() or 'CommandLine' in line and 'ProcessId' in line:
+            continue
+
+        match = re.search(r'(\d+)\s*$', line)
+        if match:
+            pid = match.group(1)
+            # CommandLine - это все до PID
+            cmd_line = line[:match.start()].strip()
+            data.append([cmd_line, pid])
+
+    df = pd.DataFrame(data, columns=['CommandLine', 'ProcessId'])
+
+    df['ProcessId'] = pd.to_numeric(df['ProcessId'])
+    # останавливаем
+    for pid in df['ProcessId']:
+        try:
+            subprocess.run(f"taskkill /pid {pid} /f", shell=True, check=True)
+            await message.answer(f"Процесс {pid} остановлен")
+        except subprocess.CalledProcessError:
+            await message.answer(f"Не удалось остановить процесс {pid}")
+
+    time.sleep(30)
+    # запускаем
+    for path in target_dirs:
+        command = f'cmd /k cd /d D:\\GITREPO\\console_test\\{path} && python explore.py'
+        subprocess.Popen(command,
+                                   shell=True,
+                                   creationflags=subprocess.CREATE_NEW_CONSOLE)
+
+        #await message.answer(text=f"Процесс {path} создан с PID: {process.pid}")
+
 
 @dp.message(Command('ping'))
 async def send_pong(message):
@@ -226,29 +341,37 @@ async def cmd_set(message: Message,command: CommandObject):
 """------------------рассылка-------------------------"""
 
 async def report0():
-    data = services()
-    if len(data.loc[data.flg.eq(True)]) != 0:
-        for i in data.loc[data.flg.eq(True)].iterrows():
+    data_OK, data_time =services()
+
+    # df в форматированную строку
+    def format_dataframe_to_string(df):
+        table_string = df.to_string(index=False)
+        return f"<pre>{table_string}</pre>"
+
+    formatted_table0 = format_dataframe_to_string(data_OK.loc[data_OK['Процент ОК']<90][['ExternalServiceName','Процент ОК','Процент TIMEOUT']])
+    formatted_table1 = format_dataframe_to_string(data_time.loc[data_time.avg_sec>data_time.avg_sec_month])
+
+    if data_OK.loc[data_OK['Процент ОК']<90].shape[0] != 0:
+        for user in users_for_send:
             try:
-                for user in users_for_send:
-                    await bot.send_message(chat_id=user, text=f"Задержка ответа по сервису:  " + str(data.loc[i[0], 'ExternalService']) + ". Ответ по сервису: " + str(round(data.loc[i[0], 'avg_sec'], 2)) + " сек . Максимальное допустимое значение: " + str(data.loc[i[0], 'tresh'])+ " сек.")
+                await bot.send_message(chat_id=user, text=formatted_table0)
+                await bot.send_message(chat_id=user, text=formatted_table1)
             except Exception as e:
                 print(e)
     else:
-        try:
-            for user in users_for_send:
+        for user in users_for_send:
+            try:
                 await bot.send_message(chat_id=user, text=f"Нет задержек по сервисам")
-
-        except Exception as e:
-            print(e)
+            except Exception as e:
+                print(e)
 
     text0, text1 = pdn_for_report()
-    try:
-        for user in users_for_send:
+    for user in users_for_send:
+        try:
             await bot.send_message(chat_id=user, text=text1)
             await bot.send_message(chat_id=user, text=text0)
-    except Exception as e:
-        print(e)
+        except Exception as e:
+            print(e)
 
 
 #попытка репортинга коллекторов
@@ -285,12 +408,12 @@ async def check():
     s = crash_process()
     if len(s) !=0:
         try:
-            await bot.send_message(chat_id=user_id, text=f"Упала консолька")
-            for i in range(len(s)):
-                await bot.send_message(chat_id=user_id, text=s[i].to_string())
+            await bot.send_message(chat_id=505568035, text=f"Упала консолька")
+            for i in s:
+                await bot.send_message(chat_id=505568035, text=i.to_string())
         except Exception as e:
             print(e)
-    else: await bot.send_message(chat_id=user_id, text=f"Все работает")
+
 
 
 
