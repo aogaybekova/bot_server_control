@@ -192,79 +192,32 @@ async def all_Service(message):
 @dp.message(Command('tasklist'))
 async def echo_handler(message: Message) -> None:
     try:
-        await message.answer(subprocess.getoutput('wmic process where "name like "python%" and commandline like "%console_test%"" get processid,commandline'))
+        await message.answer(subprocess.getoutput('docker ps --format json'))
     except TypeError:
         await message.answer("Nice cock!")
 
 @dp.message(Command('start_consoles'))
 async def start_consoles(message):
-    target_dirs = ['console', 'console_all', 'console_crimea', 'console_nerez', 'console_antifraud']
-
-    for path in target_dirs:
-    #     try:
-    #         # Формируем правильную команду для запуска в новом окне
-    #         full_path = f'D:\\GITREPO\\console_test\\{path}'
-    #         command = f'python explore.py'
-    #
-    #         # Запускаем процесс с правильными флагами
-    #         subprocess.Popen(
-    #             ['cmd', '/k', command],  # Используем список аргументов вместо строки
-    #             cwd=full_path,  # Устанавливаем рабочую директорию
-    #             creationflags=subprocess.CREATE_NEW_CONSOLE  # Создаем новое консольное окно
-    #         )
-    #         print(f"Запущен процесс: {path}")
-    #     except Exception as e:
-    #         print(f"Ошибка при запуске процесса {path}: {e}")
-
-        try:
-            command = f'cmd /k cd /d D:\\GITREPO\\console_test\\{path} && python explore.py'
-            subprocess.Popen(command,
-                                       shell=True,
-                                       creationflags=subprocess.CREATE_NEW_CONSOLE
-                                       )
-            print(f"Запущен процесс: {path}")
-        except Exception as e:
-            print(f"Ошибка при запуске процесса {path}: {e}")
+    try:
+        subprocess.Popen(
+            ['docker-compose', 'up', '-d'] + DOCKER_CONTAINERS,
+            cwd='/mlops_project'
+        )
+        await message.answer("Контейнеры запускаются")
+    except Exception as e:
+        await message.answer(f"Ошибка при запуске: {e}")
 
 # перезапуск моделек
 @dp.message(Command('restart_consoles'))
 async def restart_consoles(message):
-    target_dirs = ['console', 'console_all', 'console_crimea', 'console_nerez', 'console_antifraud']
-    command = 'wmic process where "name like "python%" and commandline like "%console_test%"" get processid,commandline'
-    result = subprocess.run(command, shell=True, capture_output=True, text=True, encoding='cp866')
-    lines = result.stdout.strip().split('\n')
-    data = []
-    for line in lines:
-        if not line.strip() or 'CommandLine' in line and 'ProcessId' in line:
-            continue
-
-        match = re.search(r'(\d+)\s*$', line)
-        if match:
-            pid = match.group(1)
-            # CommandLine - это все до PID
-            cmd_line = line[:match.start()].strip()
-            data.append([cmd_line, pid])
-
-    df = pd.DataFrame(data, columns=['CommandLine', 'ProcessId'])
-
-    df['ProcessId'] = pd.to_numeric(df['ProcessId'])
-    # останавливаем
-    for pid in df['ProcessId']:
-        try:
-            subprocess.run(f"taskkill /pid {pid} /f", shell=True, check=True)
-            await message.answer(f"Процесс {pid} остановлен")
-        except subprocess.CalledProcessError:
-            await message.answer(f"Не удалось остановить процесс {pid}")
-
-    time.sleep(30)
-    # запускаем
-    for path in target_dirs:
-        command = f'cmd /k cd /d D:\\GITREPO\\console_test\\{path} && python explore.py'
-        subprocess.Popen(command,
-                                   shell=True,
-                                   creationflags=subprocess.CREATE_NEW_CONSOLE)
-
-        #await message.answer(text=f"Процесс {path} создан с PID: {process.pid}")
+    try:
+        subprocess.Popen(
+            ['docker-compose', 'restart'] + DOCKER_CONTAINERS,
+            cwd='/mlops_project'
+        )
+        await message.answer("Контейнеры перезапускаются")
+    except Exception as e:
+        await message.answer(f"Ошибка при перезапуске: {e}")
 
 
 @dp.message(Command('ping'))
@@ -292,14 +245,14 @@ async def send_pong(message):
 @dp.message(Command('check'))
 async def check_anyway(message):
     s = crash_process()
-    if len(s) !=0:
+    if s:
         try:
-            await message.answer(text=f"Упала консолька")
+            await message.answer(text="Упали контейнеры:")
             for i in range(len(s)):
                 await message.answer(text=s[i].to_string())
         except Exception as e:
             print(e)
-    else: await message.answer(text=f"Все работает")
+    else: await message.answer(text="Все работает")
 def exec_cmd(command):
     try:
         sub_ = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
@@ -406,9 +359,9 @@ async def report1():
 #проверка не упалили консоли
 async def check():
     s = crash_process()
-    if len(s) !=0:
+    if s:
         try:
-            await bot.send_message(chat_id=505568035, text=f"Упала консолька")
+            await bot.send_message(chat_id=505568035, text="Упали контейнеры:")
             for i in s:
                 await bot.send_message(chat_id=505568035, text=i.to_string())
         except Exception as e:
