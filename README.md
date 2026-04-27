@@ -1,7 +1,7 @@
 🤖 Bot Server Control
-This project provides a Telegram bot for administering Windows servers via chat. The bot allows:
+This project provides a Telegram bot for administering Linux servers via chat using Docker Compose. The bot allows:
 
-Monitor resources (CPU, RAM, disks, processes) in real time.
+Monitor Docker Compose containers in real time.
 
 Execute commands on the server without direct SSH access (admin only).
 
@@ -21,17 +21,17 @@ Log actions for security auditing.
 #### service – check average response time of services
 #### problem_calls – problematic calls from yesterday
 #### all_service – statistics on services
-#### check – check for crashed consoles
-#### tasklist – check working consoles on current server
+#### check – check for crashed containers
+#### tasklist – check running Docker Compose containers on current server
 #### ping – check connection with servers
 #### cmd – console management (restricted access)
 #### restart – chat restart
 
 ---------------------------------------------------------------------------------------
 🤖 Bot Server Control
-Этот проект предоставляет Telegram-бота для администрирования Windows-серверов через чат. Бот позволяет:
+Этот проект предоставляет Telegram-бота для администрирования Linux-серверов через чат с использованием Docker Compose. Бот позволяет:
 
-Мониторить ресурсы (CPU, RAM, диски, процессы) в реальном времени.
+Мониторить Docker Compose контейнеры в реальном времени.
 
 Выполнять команды на сервере без прямого доступа к SSH.(только для админа)
 
@@ -51,8 +51,69 @@ Log actions for security auditing.
 ### service - проверка среднего времени ответа сервисов
 ### problem_calls - проблемные звонки за вчера
 ### all_service - статистика по сервисам
-### check - проверка упавших консолей
-### tasklist - проверка рабочих консолей на текущем серве
+### check - проверка упавших контейнеров
+### tasklist - проверка запущенных Docker Compose контейнеров на текущем серве
 ### ping - проверка коннекта с серверами
 ### cmd - консольное управление(доступ ограничен)
 ### restart - рестарт чата
+
+---------------------------------------------------------------------------------------
+# Установка и запуск на Linux + Docker
+
+## Требования
+- Linux сервер
+- Docker Engine
+- Docker Compose v2 (`docker compose`)
+- Python 3.10+
+
+## Настройка
+
+1. Клонируйте репозиторий:
+```bash
+git clone https://github.com/aogaybekova/bot_server_control.git
+cd bot_server_control
+```
+
+2. Создайте файл `.env` с переменными окружения:
+```
+db_host=your_db_host
+db_pass=your_db_password
+db_log=your_db_login
+```
+
+3. Установите зависимости:
+```bash
+pip install -r requarements.txt
+```
+
+4. Настройте `docker-compose.yml` под свои сервисы (см. пример `docker-compose.yml`).
+
+5. Убедитесь, что Docker Compose запущен и контейнеры работают из той же директории, где запускается бот:
+```bash
+docker compose up -d
+docker compose ps
+```
+
+6. Запустите бота:
+```bash
+python bot.py
+```
+
+## Мониторинг контейнеров
+
+Бот автоматически проверяет статус следующих контейнеров каждые 30 минут:
+- `console`
+- `console_all`
+- `console_crimea`
+- `console_nerez`
+- `console_antifraud`
+
+Если какой-либо контейнер не запущен (`running`), бот отправит оповещение.
+
+## Управление контейнерами через бота
+
+- `/tasklist` — показать статус всех контейнеров (`docker compose ps`)
+- `/start_consoles` — запустить все контейнеры (`docker compose up -d <service>`)
+- `/restart_consoles` — перезапустить все контейнеры (`docker compose restart <service>`)
+- `/check` — вручную проверить, все ли контейнеры запущены
+

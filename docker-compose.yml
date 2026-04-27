@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  console:
+    image: your-image:latest
+    container_name: console
+    restart: unless-stopped
+    environment:
+      - ENV_VAR=value
+    # volumes:
+    #   - ./data:/app/data
+
+  console_all:
+    image: your-image:latest
+    container_name: console_all
+    restart: unless-stopped
+    environment:
+      - ENV_VAR=value
+
+  console_crimea:
+    image: your-image:latest
+    container_name: console_crimea
+    restart: unless-stopped
+    environment:
+      - ENV_VAR=value
+
+  console_nerez:
+    image: your-image:latest
+    container_name: console_nerez
+    restart: unless-stopped
+    environment:
+      - ENV_VAR=value
+
+  console_antifraud:
+    image: your-image:latest
+    container_name: console_antifraud
+    restart: unless-stopped
+    environment:
+      - ENV_VAR=value
