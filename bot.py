@@ -192,79 +192,43 @@ async def all_Service(message):
 @dp.message(Command('tasklist'))
 async def echo_handler(message: Message) -> None:
     try:
-        await message.answer(subprocess.getoutput('wmic process where "name like "python%" and commandline like "%console_test%"" get processid,commandline'))
+        await message.answer(subprocess.getoutput('docker compose ps'))
     except TypeError:
         await message.answer("Nice cock!")
 
 @dp.message(Command('start_consoles'))
 async def start_consoles(message):
-    target_dirs = ['console', 'console_all', 'console_crimea', 'console_nerez', 'console_antifraud']
+    target_services = ['console', 'console_all', 'console_crimea', 'console_nerez', 'console_antifraud']
 
-    for path in target_dirs:
-    #     try:
-    #         # Формируем правильную команду для запуска в новом окне
-    #         full_path = f'D:\\GITREPO\\console_test\\{path}'
-    #         command = f'python explore.py'
-    #
-    #         # Запускаем процесс с правильными флагами
-    #         subprocess.Popen(
-    #             ['cmd', '/k', command],  # Используем список аргументов вместо строки
-    #             cwd=full_path,  # Устанавливаем рабочую директорию
-    #             creationflags=subprocess.CREATE_NEW_CONSOLE  # Создаем новое консольное окно
-    #         )
-    #         print(f"Запущен процесс: {path}")
-    #     except Exception as e:
-    #         print(f"Ошибка при запуске процесса {path}: {e}")
-
+    for service in target_services:
         try:
-            command = f'cmd /k cd /d D:\\GITREPO\\console_test\\{path} && python explore.py'
-            subprocess.Popen(command,
-                                       shell=True,
-                                       creationflags=subprocess.CREATE_NEW_CONSOLE
-                                       )
-            print(f"Запущен процесс: {path}")
+            result = subprocess.run(
+                ['docker', 'compose', 'up', '-d', service],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                await message.answer(f"Сервис {service} запущен")
+            else:
+                await message.answer(f"Ошибка при запуске сервиса {service}: {result.stderr}")
         except Exception as e:
-            print(f"Ошибка при запуске процесса {path}: {e}")
+            await message.answer(f"Ошибка при запуске сервиса {service}: {e}")
 
 # перезапуск моделек
 @dp.message(Command('restart_consoles'))
 async def restart_consoles(message):
-    target_dirs = ['console', 'console_all', 'console_crimea', 'console_nerez', 'console_antifraud']
-    command = 'wmic process where "name like "python%" and commandline like "%console_test%"" get processid,commandline'
-    result = subprocess.run(command, shell=True, capture_output=True, text=True, encoding='cp866')
-    lines = result.stdout.strip().split('\n')
-    data = []
-    for line in lines:
-        if not line.strip() or 'CommandLine' in line and 'ProcessId' in line:
-            continue
-
-        match = re.search(r'(\d+)\s*$', line)
-        if match:
-            pid = match.group(1)
-            # CommandLine - это все до PID
-            cmd_line = line[:match.start()].strip()
-            data.append([cmd_line, pid])
-
-    df = pd.DataFrame(data, columns=['CommandLine', 'ProcessId'])
-
-    df['ProcessId'] = pd.to_numeric(df['ProcessId'])
-    # останавливаем
-    for pid in df['ProcessId']:
+    target_services = ['console', 'console_all', 'console_crimea', 'console_nerez', 'console_antifraud']
+    for service in target_services:
         try:
-            subprocess.run(f"taskkill /pid {pid} /f", shell=True, check=True)
-            await message.answer(f"Процесс {pid} остановлен")
-        except subprocess.CalledProcessError:
-            await message.answer(f"Не удалось остановить процесс {pid}")
-
-    time.sleep(30)
-    # запускаем
-    for path in target_dirs:
-        command = f'cmd /k cd /d D:\\GITREPO\\console_test\\{path} && python explore.py'
-        subprocess.Popen(command,
-                                   shell=True,
-                                   creationflags=subprocess.CREATE_NEW_CONSOLE)
-
-        #await message.answer(text=f"Процесс {path} создан с PID: {process.pid}")
+            result = subprocess.run(
+                ['docker', 'compose', 'restart', service],
+                capture_output=True, text=True
+            )
+            if result.returncode == 0:
+                await message.answer(f"Сервис {service} перезапущен")
+            else:
+                await message.answer(f"Ошибка при перезапуске сервиса {service}: {result.stderr}")
+        except Exception as e:
+            await message.answer(f"Ошибка при перезапуске сервиса {service}: {e}")
 
 
 @dp.message(Command('ping'))
@@ -272,8 +236,8 @@ async def send_pong(message):
     pong=""
     hostname0='192.168.20.81'
     hostname1='192.168.20.82'
-    response = os.system('ping ' + hostname0)
-    response1 = os.system('ping ' + hostname1)
+    response = os.system('ping -c 4 ' + hostname0)
+    response1 = os.system('ping -c 4 ' + hostname1)
     if (response == 0)&(response1 == 0):
         pong=(str(hostname0)+' & ' +str(hostname1)+' is up')
 
@@ -295,8 +259,8 @@ async def check_anyway(message):
     if len(s) !=0:
         try:
             await message.answer(text=f"Упала консолька")
-            for i in range(len(s)):
-                await message.answer(text=s[i].to_string())
+            for i in s:
+                await message.answer(text=i)
         except Exception as e:
             print(e)
     else: await message.answer(text=f"Все работает")
@@ -410,7 +374,7 @@ async def check():
         try:
             await bot.send_message(chat_id=505568035, text=f"Упала консолька")
             for i in s:
-                await bot.send_message(chat_id=505568035, text=i.to_string())
+                await bot.send_message(chat_id=505568035, text=i)
         except Exception as e:
             print(e)
 
