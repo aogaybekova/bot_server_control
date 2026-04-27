@@ -2,6 +2,7 @@ from sqlalchemy import create_engine, text
 import pandas as pd
 import re
 import subprocess
+import json
 from dotenv import load_dotenv
 import os
 load_dotenv()
@@ -11,45 +12,34 @@ log = os.getenv("db_log")
 
 #мои модельки
 def crash_process():
-    r = subprocess.getoutput('wmic process where "name like "python%"" get processid,commandline')
-    target_dirs = [
-        'console',
-        'console_all',
-        'console_crimea',
-        'console_nerez',
-        'console_antifraud'
-    ]
-    lines = [line for line in r.split('\n') if line.strip()]
+    target_containers = ['prod_antifraud', 'prod_nerez', 'prod_repeated', 'prod_crimea', 'prod_all']
 
-    # Пропускаем заголовки (первые две строки)
-    processed_lines = []
+    try:
+        result = subprocess.run(
+            ['docker', 'ps', '--format', '{{json .}}'],
+            capture_output=True, text=True
+        )
+        lines = [line.strip() for line in result.stdout.strip().split('\n') if line.strip()]
+    except Exception:
+        lines = []
+
+    running_containers = {}
     for line in lines:
-        # Ищем числовой ProcessId в конце строки
-        match = re.search(r'(\d+)\s*$', line)
-        if match:
-            pid = match.group(1)
-            # Извлекаем CommandLine (всё до начала ProcessId, убирая пробелы в конце)
-            cmd_line = line[:match.start()].rstrip()
-            processed_lines.append([cmd_line, int(pid)])
+        try:
+            container = json.loads(line)
+            name = container.get('Names', '')
+            state = container.get('State', '')
+            running_containers[name] = state
+        except json.JSONDecodeError:
+            continue
 
-    df = pd.DataFrame(processed_lines, columns=['CommandLine', 'ProcessId'])
+    crashed = []
+    for name in target_containers:
+        state = running_containers.get(name, 'not found')
+        if state != 'running':
+            crashed.append(pd.Series({'Name': name, 'State': state}))
 
-    # Создаем регулярное выражение для поиска
-    pattern = r"console_test\\(?:" + "|".join(target_dirs) + r")\\"
-
-    # Фильтруем строки, содержащие нужные поддиректории
-    filtered_df = df[df['CommandLine'].str.contains(pattern, regex=True)].copy()
-
-    # Извлекаем названия поддиректорий
-    filtered_df['SubDir'] = filtered_df['CommandLine'].str.extract(
-        r"console_test\\([^\\]+)",
-        expand=False
-    )
-
-    # Получаем список уникальных поддиректорий
-    subdir_list = filtered_df['SubDir'].unique().tolist()
-    missing_dirs = [dir for dir in target_dirs if dir not in subdir_list]
-    return missing_dirs
+    return crashed
 
 # выгрузка заявок
 def new_data():
