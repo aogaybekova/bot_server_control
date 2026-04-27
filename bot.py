@@ -192,79 +192,30 @@ async def all_Service(message):
 @dp.message(Command('tasklist'))
 async def echo_handler(message: Message) -> None:
     try:
-        await message.answer(subprocess.getoutput('wmic process where "name like "python%" and commandline like "%console_test%"" get processid,commandline'))
+        await message.answer(subprocess.getoutput('docker ps --format json'))
     except TypeError:
         await message.answer("Nice cock!")
 
 @dp.message(Command('start_consoles'))
 async def start_consoles(message):
-    target_dirs = ['console', 'console_all', 'console_crimea', 'console_nerez', 'console_antifraud']
-
-    for path in target_dirs:
-    #     try:
-    #         # Формируем правильную команду для запуска в новом окне
-    #         full_path = f'D:\\GITREPO\\console_test\\{path}'
-    #         command = f'python explore.py'
-    #
-    #         # Запускаем процесс с правильными флагами
-    #         subprocess.Popen(
-    #             ['cmd', '/k', command],  # Используем список аргументов вместо строки
-    #             cwd=full_path,  # Устанавливаем рабочую директорию
-    #             creationflags=subprocess.CREATE_NEW_CONSOLE  # Создаем новое консольное окно
-    #         )
-    #         print(f"Запущен процесс: {path}")
-    #     except Exception as e:
-    #         print(f"Ошибка при запуске процесса {path}: {e}")
-
-        try:
-            command = f'cmd /k cd /d D:\\GITREPO\\console_test\\{path} && python explore.py'
-            subprocess.Popen(command,
-                                       shell=True,
-                                       creationflags=subprocess.CREATE_NEW_CONSOLE
-                                       )
-            print(f"Запущен процесс: {path}")
-        except Exception as e:
-            print(f"Ошибка при запуске процесса {path}: {e}")
+    try:
+        command = 'docker-compose up -d prod_antifraud prod_nerez prod_repeated prod_crimea prod_all'
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        output = result.stdout + result.stderr
+        await message.answer(output if output.strip() else "Контейнеры запущены")
+    except Exception as e:
+        await message.answer(f"Ошибка при запуске контейнеров: {e}")
 
 # перезапуск моделек
 @dp.message(Command('restart_consoles'))
 async def restart_consoles(message):
-    target_dirs = ['console', 'console_all', 'console_crimea', 'console_nerez', 'console_antifraud']
-    command = 'wmic process where "name like "python%" and commandline like "%console_test%"" get processid,commandline'
-    result = subprocess.run(command, shell=True, capture_output=True, text=True, encoding='cp866')
-    lines = result.stdout.strip().split('\n')
-    data = []
-    for line in lines:
-        if not line.strip() or 'CommandLine' in line and 'ProcessId' in line:
-            continue
-
-        match = re.search(r'(\d+)\s*$', line)
-        if match:
-            pid = match.group(1)
-            # CommandLine - это все до PID
-            cmd_line = line[:match.start()].strip()
-            data.append([cmd_line, pid])
-
-    df = pd.DataFrame(data, columns=['CommandLine', 'ProcessId'])
-
-    df['ProcessId'] = pd.to_numeric(df['ProcessId'])
-    # останавливаем
-    for pid in df['ProcessId']:
-        try:
-            subprocess.run(f"taskkill /pid {pid} /f", shell=True, check=True)
-            await message.answer(f"Процесс {pid} остановлен")
-        except subprocess.CalledProcessError:
-            await message.answer(f"Не удалось остановить процесс {pid}")
-
-    time.sleep(30)
-    # запускаем
-    for path in target_dirs:
-        command = f'cmd /k cd /d D:\\GITREPO\\console_test\\{path} && python explore.py'
-        subprocess.Popen(command,
-                                   shell=True,
-                                   creationflags=subprocess.CREATE_NEW_CONSOLE)
-
-        #await message.answer(text=f"Процесс {path} создан с PID: {process.pid}")
+    try:
+        command = 'docker-compose restart prod_antifraud prod_nerez prod_repeated prod_crimea prod_all'
+        result = subprocess.run(command, shell=True, capture_output=True, text=True)
+        output = result.stdout + result.stderr
+        await message.answer(output if output.strip() else "Контейнеры перезапущены")
+    except Exception as e:
+        await message.answer(f"Ошибка при перезапуске контейнеров: {e}")
 
 
 @dp.message(Command('ping'))
